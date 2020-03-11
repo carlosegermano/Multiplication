@@ -12,6 +12,8 @@ import org.springframework.util.Assert;
 import microservices.book.multiplication.domain.Multiplication;
 import microservices.book.multiplication.domain.MultiplicationResultAttempt;
 import microservices.book.multiplication.domain.User;
+import microservices.book.multiplication.event.EventDispatcher;
+import microservices.book.multiplication.event.MultiplicationSolvedEvent;
 import microservices.book.multiplication.repository.MultiplicationResultAttemptRepository;
 import microservices.book.multiplication.repository.UserRepository;
 
@@ -21,6 +23,7 @@ class MultiplicationServiceImpl implements MultiplicationService {
 	private RandomGeneratorService randomGeneratorService;
 	private MultiplicationResultAttemptRepository attemptRepository;
 	private UserRepository userRepository;
+	private EventDispatcher eventDispatcher;
 
 	@Autowired
 	public MultiplicationServiceImpl(final RandomGeneratorService randomGeneratorService,
@@ -52,10 +55,20 @@ class MultiplicationServiceImpl implements MultiplicationService {
 
 		MultiplicationResultAttempt checkedAttempt = new MultiplicationResultAttempt(user.orElse(attempt.getUser()),
 				attempt.getMultiplication(), attempt.getResultAttempt(), isCorrect);
+		// Store the attempt
 		attemptRepository.save(checkedAttempt);
+		
+		// Communicate result via Event
+		eventDispatcher.send(
+				new MultiplicationSolvedEvent(checkedAttempt.getId(),
+						checkedAttempt.getUser().getId(),
+						checkedAttempt.isCorrect())
+				);
+		
 		return isCorrect;
 	}
 
+	@Override
 	public List<MultiplicationResultAttempt> getStatsForUser(String userAlias) {
 		return attemptRepository.findTop5ByUserAliasOrderByIdDesc(userAlias);
 	}
